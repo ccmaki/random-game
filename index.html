@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- BEGIN PAGE -->
+<title>Liar's Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: a chart table. The island map sits on the left in a sea frame, the islanders' testimony is a ledger on the right; they stack on phones. */
+:root {
+  --table: #d9c79c;        /* the desk the chart lies on */
+  --paper: #efe2bd;
+  --paper-edge: #c9b27a;
+  --ink: #33251a;
+  --ink-soft: #6b5640;
+  --sea: #2c6a73;
+  --sea-deep: #1f4f57;
+  --x: #a8261b;            /* the red X */
+  --honest: #2f6b3a;
+  --sand: #e6cd8a;
+  --jungle: #7d9850;
+  --rocks: #a69d8c;
+  --marsh: #6c8f84;
+  --tile-line: rgba(51, 37, 26, .28);
+  --font-display: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
+  --font-voice: "IM Fell English", "Iowan Old Style", Georgia, serif;
+  --font-body: "Alegreya Sans", "Gill Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --table: #0f171d; --paper: #1b2830; --paper-edge: #31444f; --ink: #eadfc4; --ink-soft: #a9a089;
+    --sea: #154049; --sea-deep: #0c2a31; --x: #ff7461; --honest: #7fcf8c;
+    --sand: #8d7745; --jungle: #4b6431; --rocks: #6c675d; --marsh: #3d5f58; --tile-line: rgba(234, 223, 196, .22);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --table: #0f171d; --paper: #1b2830; --paper-edge: #31444f; --ink: #eadfc4; --ink-soft: #a9a089;
+  --sea: #154049; --sea-deep: #0c2a31; --x: #ff7461; --honest: #7fcf8c;
+  --sand: #8d7745; --jungle: #4b6431; --rocks: #6c675d; --marsh: #3d5f58; --tile-line: rgba(234, 223, 196, .22);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--table);
+  color: var(--ink);
+  font: 16px/1.45 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.chart {
+  max-width: 980px;
+  margin: 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--paper-edge);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--paper-edge), 0 18px 40px -24px rgba(0,0,0,.45);
+  padding: clamp(16px, 3vw, 32px);
+  display: grid;
+  gap: 24px;
+}
+
+/* ---------- header ---------- */
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; border-bottom: 1px solid var(--tile-line); padding-bottom: 16px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(34px, 6vw, 52px); line-height: 1; margin: 0; letter-spacing: .01em; }
+.subtitle { font-family: var(--font-voice); font-style: italic; color: var(--ink-soft); margin: 6px 0 0; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+select, button {
+  font: 500 15px var(--font-body);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--ink-soft);
+  border-radius: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+button:hover, select:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+button:focus-visible, select:focus-visible, .tile:focus-visible, .portrait:focus-visible { outline: 2px solid var(--x); outline-offset: 2px; }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button.primary:hover { background: color-mix(in srgb, var(--ink) 85%, var(--x)); }
+
+/* ---------- layout ---------- */
+.table { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 760px) { .table { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- status ---------- */
+.status { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
+.liar-count { font-family: var(--font-voice); font-size: 19px; }
+.liar-count strong { color: var(--x); font-weight: 400; }
+.shovels { display: flex; gap: 6px; align-items: center; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.shovel { width: 22px; height: 22px; display: inline-grid; place-items: center; font-size: 17px; transition: opacity .3s, filter .3s; }
+.shovel.spent { opacity: .25; filter: grayscale(1); }
+
+/* ---------- the map ---------- */
+.sea {
+  position: relative;
+  background:
+    repeating-radial-gradient(circle at 0 0, transparent 0 10px, color-mix(in srgb, var(--paper) 10%, transparent) 10px 11px),
+    var(--sea);
+  padding: clamp(18px, 4vw, 30px);
+  border: 1px solid var(--sea-deep);
+  border-radius: 2px;
+}
+.axis { position: absolute; display: grid; font: 12px var(--font-display); color: color-mix(in srgb, var(--paper) 80%, transparent); pointer-events: none; }
+.axis.cols { left: clamp(18px, 4vw, 30px); right: clamp(18px, 4vw, 30px); top: 0; height: clamp(18px, 4vw, 30px); align-items: center; text-align: center; }
+.axis.rows { top: clamp(18px, 4vw, 30px); bottom: clamp(18px, 4vw, 30px); left: 0; width: clamp(18px, 4vw, 30px); justify-items: center; align-items: center; }
+.compass { position: absolute; right: 4px; bottom: 2px; font: 14px var(--font-display); color: var(--paper); opacity: .85; }
+.board {
+  display: grid;
+  aspect-ratio: 1;
+  max-width: 100%;
+  border: 2px solid var(--ink);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sand) 60%, transparent);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tile {
+  position: relative;
+  border: 0;
+  border-right: 1px solid var(--tile-line);
+  border-bottom: 1px solid var(--tile-line);
+  border-radius: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(18px, 4.5vw, 30px);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tile:hover { background-image: linear-gradient(color-mix(in srgb, var(--ink) 10%, transparent), color-mix(in srgb, var(--ink) 10%, transparent)); }
+.t-sand   { background-color: var(--sand);   background-image: radial-gradient(color-mix(in srgb, var(--ink) 22%, transparent) 1px, transparent 1.4px); background-size: 9px 9px; }
+.t-jungle { background-color: var(--jungle); background-image: radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--ink) 28%, transparent) 2px, transparent 2.5px), radial-gradient(circle at 70% 75%, color-mix(in srgb, var(--ink) 22%, transparent) 2px, transparent 2.5px); background-size: 14px 14px; }
+.t-rocks  { background-color: var(--rocks);  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--ink) 20%, transparent) 0 1px, transparent 1px 7px); }
+.t-marsh  { background-color: var(--marsh);  background-image: repeating-linear-gradient(0deg, transparent 0 6px, color-mix(in srgb, var(--paper) 30%, transparent) 6px 7px); }
+.tile.landmark { cursor: default; }
+.tile.landmark:hover { background-image: none; }
+.tile .lm { filter: drop-shadow(0 1px 0 rgba(0,0,0,.25)); line-height: 1; }
+
+/* hand-inked cross for ruled-out tiles */
+.tile.crossed::before, .tile.crossed::after {
+  content: ""; position: absolute; left: 22%; right: 22%; top: 50%; height: 2.5px;
+  background: color-mix(in srgb, var(--ink) 75%, transparent); border-radius: 2px;
+}
+.tile.crossed::before { transform: rotate(45deg); }
+.tile.crossed::after  { transform: rotate(-45deg); }
+.tile.hole .pit { width: 46%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #1a120c 40%, #4a3524 75%, transparent 77%); }
+.tile.treasure::before, .tile.treasure::after {
+  content: ""; position: absolute; left: 14%; right: 14%; top: 50%; height: 5px; background: var(--x); border-radius: 3px;
+}
+.tile.treasure::before { transform: rotate(45deg); }
+.tile.treasure::after  { transform: rotate(-45deg); }
+.tile.treasure .chest { position: relative; z-index: 1; animation: rise .6s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes rise { from { transform: translateY(40%) scale(.4); opacity: 0; } }
+.tile.just-dug { animation: thud .35s; }
+@keyframes thud { 30% { transform: scale(.9); } }
+.board.dig-mode .tile:not(.landmark):not(.hole) { cursor: crosshair; }
+
+/* ---------- tools under the map ---------- */
+.tools { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-top: 14px; }
+.mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 2px; overflow: hidden; }
+.mode button { border: 0; border-radius: 0; padding: 9px 14px; }
+.mode button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.mode button[data-mode="dig"][aria-pressed="true"] { background: var(--x); color: #fff; }
+.hint { font-size: 14px; color: var(--ink-soft); margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 14px; height: 14px; border: 1px solid var(--tile-line); display: inline-block; }
+
+/* ---------- islanders ---------- */
+.ledger h2 { font: 400 24px var(--font-display); margin: 0 0 4px; }
+.ledger .note { font-size: 14px; color: var(--ink-soft); margin: 0 0 14px; }
+.islanders { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.islander { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: start; }
+.portrait {
+  width: 64px; display: grid; justify-items: center; gap: 2px; padding: 6px 0 5px;
+  border: 1px solid var(--tile-line); border-radius: 2px; background: color-mix(in srgb, var(--paper-edge) 25%, transparent);
+}
+.portrait .face { font-size: 32px; line-height: 1.1; }
+.portrait .tag { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.portrait[data-mark="honest"] { border-color: var(--honest); }
+.portrait[data-mark="honest"] .tag { color: var(--honest); font-weight: 700; }
+.portrait[data-mark="liar"] { border-color: var(--x); }
+.portrait[data-mark="liar"] .tag { color: var(--x); font-weight: 700; }
+.speech { min-width: 0; }
+.speech .who { font: 400 18px var(--font-display); }
+.speech .who .verdict { font: 700 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; margin-left: 8px; padding: 2px 6px; border-radius: 2px; vertical-align: 2px; }
+.verdict.liar { background: var(--x); color: #fff; }
+.verdict.honest { background: var(--honest); color: var(--paper); }
+.speech ul { margin: 2px 0 0; padding: 0; list-style: none; }
+.speech li { font: 18px/1.35 var(--font-voice); font-style: italic; padding: 2px 0; }
+.islander.revealed-liar li { text-decoration: line-through; text-decoration-color: var(--x); text-decoration-thickness: 2px; color: var(--ink-soft); }
+
+/* ---------- result ---------- */
+.result { border-top: 1px solid var(--tile-line); padding-top: 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+.result p { margin: 0; font: 22px var(--font-voice); }
+.result.win p strong { color: var(--honest); font-weight: 400; }
+.result.lose p strong { color: var(--x); font-weight: 400; }
+
+details.rules { border-top: 1px solid var(--tile-line); padding-top: 12px; }
+details.rules summary { cursor: pointer; font: 400 19px var(--font-display); }
+details.rules div { max-width: 65ch; color: var(--ink-soft); }
+details.rules p { margin: 8px 0; }
+.foot { font-size: 13px; color: var(--ink-soft); text-align: center; margin: 0; font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="chart">
+  <header>
+    <div>
+      <h1>Liar's Map</h1>
+      <p class="subtitle">Some of the islanders lie. All of them know where the treasure is.</p>
+    </div>
+    <div class="controls">
+      <label for="difficulty" hidden>Difficulty</label>
+      <select id="difficulty" aria-label="Difficulty">
+        <option value="easy">Easy: 3 islanders</option>
+        <option value="normal" selected>Normal: 4 islanders</option>
+        <option value="hard">Hard: 5 islanders</option>
+      </select>
+      <button id="new-island" class="primary" type="button">New island</button>
+    </div>
+  </header>
+
+  <div class="table">
+    <section aria-label="Island map">
+      <div class="status">
+        <div class="liar-count" id="liar-count"></div>
+        <div class="shovels" id="shovels" aria-live="polite"></div>
+      </div>
+      <div class="sea">
+        <div class="axis cols" id="axis-cols" aria-hidden="true"></div>
+        <div class="axis rows" id="axis-rows" aria-hidden="true"></div>
+        <div class="board" id="board" role="grid" aria-label="Island tiles"></div>
+        <div class="compass" aria-hidden="true">N ↑</div>
+      </div>
+      <div class="tools">
+        <div class="mode" role="group" aria-label="Tap mode">
+          <button type="button" data-mode="mark" aria-pressed="true">✗ Cross off</button>
+          <button type="button" data-mode="dig" aria-pressed="false">Dig here</button>
+        </div>
+        <p class="hint" id="hint">Tap tiles to cross them off.</p>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="ledger" aria-label="Islanders">
+      <h2>What the islanders say</h2>
+      <p class="note">Honest islanders only say true things. Liars only say false things. Tap a portrait to note your suspicion.</p>
+      <ul class="islanders" id="islanders"></ul>
+    </section>
+  </div>
+
+  <div class="result" id="result" hidden>
+    <p id="result-text"></p>
+    <button type="button" class="primary" id="again">Sail to a new island</button>
+  </div>
+
+  <details class="rules">
+    <summary>How to play</summary>
+    <div>
+      <p>The treasure is buried on one tile. It is never under a landmark.</p>
+      <p>Each islander is either honest or a liar. Honest islanders tell only the truth; liars say only false things, every time. You are told how many of them lie.</p>
+      <p>Work out who is lying, then use the true statements to find the tile. Cross off tiles as you rule them out, switch to <em>Dig here</em>, and tap the tile. You have three shovels.</p>
+      <p><strong>Reading the clues:</strong> "north of the Hut" means any row above the Hut's row. "Right next to" includes diagonals. "Within 2 steps" counts diagonal steps as one. The coast is the outer ring of tiles. The "northern half" is the top half of the rows.</p>
+      <p>Every island has exactly one answer, so you never need to guess.</p>
+    </div>
+  </details>
+  <p class="foot" id="foot"></p>
+</main>
+
+<script src="game.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const MARKS = ['none', 'honest', 'liar'];
+  const TAG = { none: 'unsure', honest: 'honest?', liar: 'liar?' };
+  const TERRAIN_COLOR = { sand: '--sand', jungle: '--jungle', rocks: '--rocks', marsh: '--marsh' };
+  let S; // game state
+
+  function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  function newGame(difficulty, seed) {
+    const puzzle = LiarsMap.generate(difficulty, seed);
+    S = { puzzle, mode: 'mark', crossed: new Set(), holes: new Set(), shovels: 3, over: false, won: false,
+          marks: puzzle.islanders.map(() => 'none'), lastDug: null };
+    render();
+  }
+
+  const key = (r, c) => r + ',' + c;
+  const landmarkAt = (r, c) => S.puzzle.map.landmarks.find((l) => l.r === r && l.c === c);
+
+  function render() {
+    const { puzzle } = S;
+    const n = puzzle.map.size;
+    const total = puzzle.islanders.length;
+    $('liar-count').innerHTML = `<strong>${puzzle.liarCount}</strong> of ${total} islanders ${puzzle.liarCount === 1 ? 'is a liar' : 'are liars'}.`;
+    $('shovels').innerHTML = 'Shovels ' + [0, 1, 2].map((i) => `<span class="shovel ${i < S.shovels ? '' : 'spent'}" aria-hidden="true">🪏</span>`).join('') +
+      `<span class="sr" hidden>${S.shovels} left</span>`;
+
+    // axes
+    $('axis-cols').style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+    $('axis-cols').innerHTML = [...Array(n)].map((_, i) => `<span>${String.fromCharCode(65 + i)}</span>`).join('');
+    $('axis-rows').style.gridTemplateRows = `repeat(${n}, 1fr)`;
+    $('axis-rows').innerHTML = [...Array(n)].map((_, i) => `<span>${i + 1}</span>`).join('');
+
+    // board
+    const board = $('board');
+    board.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+    board.classList.toggle('dig-mode', S.mode === 'dig');
+    let html = '';
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const t = puzzle.map.terrain[r][c];
+        const lm = landmarkAt(r, c);
+        const k = key(r, c);
+        const isTreasure = S.over && puzzle.treasure.r === r && puzzle.treasure.c === c;
+        const cls = ['tile', 't-' + t];
+        let inner = '';
+        let label = `${String.fromCharCode(65 + c)}${r + 1}, ${LiarsMap.TERRAINS[t].label}`;
+        if (lm) { cls.push('landmark'); inner = `<span class="lm" title="${lm.name}">${lm.icon}</span>`; label += ', ' + lm.name; }
+        else if (isTreasure) { cls.push('treasure'); inner = '<span class="chest">💰</span>'; label += ', treasure'; }
+        else if (S.holes.has(k)) { cls.push('hole'); inner = '<span class="pit"></span>'; label += ', dug, empty'; }
+        else if (S.crossed.has(k)) { cls.push('crossed'); label += ', crossed off'; }
+        if (S.lastDug === k) cls.push('just-dug');
+        html += `<button type="button" class="${cls.join(' ')}" data-r="${r}" data-c="${c}" aria-label="${label}"${lm ? ' aria-disabled="true"' : ''}>${inner}</button>`;
+      }
+    }
+    board.innerHTML = html;
+    S.lastDug = null;
+
+    // mode
+    document.querySelectorAll('.mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)));
+    $('hint').textContent = S.over ? 'Island finished.' : S.mode === 'dig' ? 'Tap the tile to dig. This uses a shovel.' : 'Tap tiles to cross them off.';
+
+    // legend
+    const terrains = Object.keys(TERRAIN_COLOR).map((t) => `<span><i class="swatch t-${t}"></i>${LiarsMap.TERRAINS[t].label}</span>`);
+    const lms = puzzle.map.landmarks.map((l) => `<span>${l.icon} ${l.name}</span>`);
+    $('legend').innerHTML = terrains.concat(lms).join('');
+
+    // islanders
+    $('islanders').innerHTML = puzzle.islanders.map((p, i) => {
+      const mark = S.marks[i];
+      const verdict = S.over ? `<span class="verdict ${p.liar ? 'liar' : 'honest'}">${p.liar ? 'Liar' : 'Honest'}</span>` : '';
+      return `<li class="islander ${S.over && p.liar ? 'revealed-liar' : ''}">
+        <button type="button" class="portrait" data-i="${i}" data-mark="${mark}" aria-label="${p.name}: you marked ${TAG[mark]}. Tap to change.">
+          <span class="face" aria-hidden="true">${p.icon}</span><span class="tag">${TAG[mark]}</span>
+        </button>
+        <div class="speech"><div class="who">${p.name}${verdict}</div><ul>${p.lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>
+      </li>`;
+    }).join('');
+
+    // result
+    $('result').hidden = !S.over;
+    $('result').className = 'result ' + (S.won ? 'win' : 'lose');
+    if (S.over) {
+      const liars = puzzle.islanders.filter((p) => p.liar).map((p) => p.name);
+      const who = liars.length === 1 ? `${liars[0]} was the liar` : `${liars.slice(0, -1).join(', ')} and ${liars.at(-1)} were the liars`;
+      const used = 3 - S.shovels;
+      $('result-text').innerHTML = S.won
+        ? `<strong>Treasure found</strong> with ${used} ${used === 1 ? 'shovel' : 'shovels'}. ${who}.`
+        : `<strong>Out of shovels.</strong> ${who}. The treasure is marked on the map.`;
+    }
+    $('difficulty').value = puzzle.difficulty;
+    $('foot').textContent = `Island #${puzzle.seed}`;
+  }
+
+  $('board').addEventListener('click', (e) => {
+    const t = e.target.closest('.tile');
+    if (!t || S.over) return;
+    const r = +t.dataset.r, c = +t.dataset.c, k = key(r, c);
+    if (landmarkAt(r, c) || S.holes.has(k)) return;
+    if (S.mode === 'mark') {
+      S.crossed.has(k) ? S.crossed.delete(k) : S.crossed.add(k);
+    } else {
+      S.shovels--;
+      S.lastDug = k;
+      if (S.puzzle.treasure.r === r && S.puzzle.treasure.c === c) { S.over = true; S.won = true; }
+      else {
+        S.holes.add(k); S.crossed.delete(k);
+        if (S.shovels === 0) S.over = true;
+      }
+      S.mode = 'mark'; // one dig per tap of the Dig button, so a stray tap never wastes a shovel
+    }
+    render();
+    if (!S.over) document.querySelector(`.tile[data-r="${r}"][data-c="${c}"]`)?.focus();
+  });
+
+  document.querySelector('.mode').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || S.over) return;
+    S.mode = b.dataset.mode;
+    render();
+  });
+
+  $('islanders').addEventListener('click', (e) => {
+    const b = e.target.closest('.portrait');
+    if (!b || S.over) return;
+    const i = +b.dataset.i;
+    S.marks[i] = MARKS[(MARKS.indexOf(S.marks[i]) + 1) % MARKS.length];
+    render();
+    document.querySelector(`.portrait[data-i="${i}"]`)?.focus();
+  });
+
+  const fresh = () => { storeSet('liarsmap.difficulty', $('difficulty').value); newGame($('difficulty').value); };
+  $('new-island').addEventListener('click', fresh);
+  $('again').addEventListener('click', fresh);
+  $('difficulty').addEventListener('change', fresh);
+
+  const start = () => newGame(storeGet('liarsmap.difficulty') || 'normal');
+  start();
+})();
+</script>
+<!-- END PAGE -->
+</body>
+</html>
